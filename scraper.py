@@ -1,7 +1,7 @@
 import re
 from urllib.parse import urlparse
 import re
-from urllib.parse import urlparse
+from urllib.robotparser import RobotFileParser
 from bs4 import BeautifulSoup
 import lxml
 
@@ -10,7 +10,6 @@ import lxml
 validLinkHistoryNoFragments = set()
 validLinkHistory = set()
 totalLinkHistory = set()
-validRobotsHistory = set()
 
 def scraper(url, resp):
     links = extract_next_links(url, resp)
