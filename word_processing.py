@@ -38,6 +38,7 @@ def create_data_folder():
     pathlib.Path("data/page_lengths.txt").touch(exist_ok=True)
     pathlib.Path("data/report.txt").touch(exist_ok=True)
     pathlib.Path("data/valid.txt").touch(exist_ok=True)
+    pathlib.Path("data/invalid.txt").touch(exist_ok=True)
 
 def compute_page_length(token_list):
     return len(token_list)
@@ -122,3 +123,12 @@ def count_subdomains():
     report.write("\n")
     url_file.close()
     report.close()
+
+def create_report():
+    count_unique_links()
+    find_longest_page()
+    tally_top_50_words()
+    count_subdomains()
+
+if __name__ == '__main__':
+    create_report()
