@@ -1,6 +1,7 @@
 import re
 import json
 import pathlib
+from urllib.parse import urlparse
 
 stop_list = ['a', 'about', 'above', 'after', 'again', 'against', 'all', 'am', 'an',
             'and', 'any', 'are', "aren't", 'as', 'at', 'be', 'because', 'been', 'before',
@@ -106,8 +107,21 @@ def count_unique_links():
     url_file.close()
     report.close()
     
-
 def count_subdomains():
-    pass
-    
+    url_file = open("data/valid.txt", 'r')
+    report = open("data/report.txt", "a")
+    subdomains = {"ics.uci.edu": 0}
+    for line in url_file:
+        url = urlparse(line)
+        domain = re.sub("^www.", "", url.netloc)
+        if domain in subdomains:
+            subdomains[domain] += 1
+        else:
+            subdomains[domain] = 1
+    report.write("ics.uci.edu subdomains: \n")
+    for domain in subdomains:
+        report.write(f"{domain}, {subdomains[domain]}\n")
+    report.write("\n")
+    url_file.close()
+    report.close()
     
