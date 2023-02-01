@@ -113,7 +113,7 @@ def count_subdomains():
         domain = re.sub("^www.", "", url.netloc)
         if domain in subdomains:
             subdomains[domain] += 1
-        else:
+        elif(re.match(".+\.ics.uci.edu$", domain)):
             subdomains[domain] = 1
     report.write("ics.uci.edu subdomains: \n")
     for domain in subdomains:
