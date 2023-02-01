@@ -40,10 +40,7 @@ def create_data_folder():
     pathlib.Path("data/valid.txt").touch(exist_ok=True)
 
 def compute_page_length(token_list):
-    count = 0
-    for token in token_list:
-        count += 1
-    return count
+    return len(token_list)
 
 def save_page_length(page_lengths):
     file = open("data/page_lengths.txt", "a")
