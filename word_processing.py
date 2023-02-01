@@ -35,7 +35,8 @@ def create_data_folder():
     # Creates the data folder or overwrites it if it already exists
     pathlib.Path("data").mkdir(exist_ok = True)
     pathlib.Path("data/word_counts.txt").touch(exist_ok=True)
-    pathlib.Path("data/top_50_words.txt").touch(exist_ok=True)
+    pathlib.Path("data/report.txt").touch(exist_ok=True)
+    pathlib.Path("data/valid.txt").touch(exist_ok=True)
 
 def save_word_count(frequencies):
     file = open("data/word_counts.txt", "a")
@@ -45,7 +46,8 @@ def save_word_count(frequencies):
 
 def tally_top_50_words():
     word_counts_file = open("data/word_counts.txt", "r")
-    output_file = open("data/top_50_words.txt", "a")
+    output_file = open("data/report.txt", "a")
+    output_file.write("Top 50 Words in the domains: \n")
     freq_totals = {}
     for line in word_counts_file:
         freq = json.loads(line)
@@ -64,10 +66,24 @@ def tally_top_50_words():
         if key in stop_list:
             pass
         else:
-            output_file.write(f"{count}: Word: <{key}> Total: <{-value}>\n")
+            output_file.write(f"{count}: Word: <{key}> Total: <{-value}> \n")
             count += 1
+    output_file.write("\n")
+    word_counts_file.close()
+    output_file.close()
 
 def count_unique_links():
+    url_file = open("data/valid.txt", 'r')
+    url_count_file = open("data/report.txt", "a")
+    url_count = 0
+    for line in url_file:
+        url_count += 1
+    url_count_file.write(f"Total number of unique URLs: {url_count} \n\n")
+    url_file.close()
+    url_count_file.close()
+    
+
+def count_subdomains():
     pass
     
     
