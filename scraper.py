@@ -88,7 +88,9 @@ def is_valid(url):
 
         if (everythingValid): #netloc is correct, path is correct, and entire link is unique
             robotsTxt = RobotFileParser(parsed.scheme + "://" + parsed.netloc + "/robots.txt")
-            
+            robotsTxt.read()
+            if not robotsTxt.can_fetch("UW23 55097037,94863973,34175030,70796407", url): # Check if url is allowed in robots.txt
+                return False
             noFragment = url.replace(parsed.fragment,"")
             validLinkHistoryNoFragments.add(noFragment) #add defrag link to set
             validLinkHistory.add(url)  #add link to overall history
