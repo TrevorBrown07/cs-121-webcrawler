@@ -45,6 +45,7 @@ def compute_page_length(token_list):
 def save_page_length(page_lengths):
     file = open("data/page_lengths.txt", "a")
     json.dump(page_lengths)
+    file.write("\n")
     file.close()
 
 def find_longest_page():
@@ -121,4 +122,3 @@ def count_subdomains():
     report.write("\n")
     url_file.close()
     report.close()
-    

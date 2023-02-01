@@ -4,42 +4,55 @@ import re
 from urllib.robotparser import RobotFileParser
 from bs4 import BeautifulSoup
 import lxml
+import word_processing
 
 
-
+word_processing.create_data_folder()
 validLinkHistoryNoFragments = set()
 validLinkHistory = set()
 totalLinkHistory = set()
 
 def scraper(url, resp):
-    links = extract_next_links(url, resp)
-    return [link for link in links if is_valid(link)]
-
-def extract_next_links(url, resp):
-    # Implementation required.
-    # url: the URL that was used to get the page
-    # resp.url: the actual url of the page
-    actualURL = resp.url
     # resp.status: the status code returned by the server. 200 is OK, you got the page. Other numbers mean that there was some kind of problem.
     statusCode = resp.status
     # resp.error: when status is not 200, you can check the error here, if needed.
     if statusCode != 200:
         return []
-    else:
-        # resp.raw_response: this is where the page actually is. More specifically, the raw_response has two parts:
-        rawResponse = resp.raw_response
-        #resp.raw_response.content: the content of the page!
-        htmlContent = rawResponse.content
-        soup = BeautifulSoup(htmlContent, "lxml")
-        links = soup.find_all('a', href=True)
-        links = [i.get('href') for i in links]
-        # Return a list with the hyperlinks (as strings) scrapped from resp.raw_response.content
-        if links: return links
+    # resp.raw_response: this is where the page actually is. More specifically, the raw_response has two parts:
+    rawResponse = resp.raw_response
+    #resp.raw_response.content: the content of the page!
+    htmlContent = rawResponse.content
+    soup = BeautifulSoup(htmlContent, "lxml")
+    token_list = word_processing.tokenize(soup.get_text()) #Create token list of text
+    if not token_list: #If the token list is empty, page is dead, no need to continue
         return []
+    parsed = urlparse(url)
+    noFragment = url.replace(parsed.fragment,"")
+    if noFragment in validLinkHistoryNoFragments: 
+        pass
+    else:
+        validLinkHistoryNoFragments.add(noFragment) 
+        with open('data/valid.txt',"a") as f:
+            f.write(noFragment)
+            f.write("\n")
+        word_frequencies = word_processing.compute_word_frequencies(token_list)
+        page_length = word_processing.compute_page_length(token_list)
+        word_processing.save_page_length({url:page_length})
+        word_processing.save_word_count(word_frequencies)
+    links = extract_next_links(soup, resp)
+    
+    return [link for link in links if is_valid(link)]
+
+def extract_next_links(soup, resp):
+    # Implementation required.
+    # url: the URL that was used to get the page
+    links = soup.find_all('a', href=True)
+    links = [i.get('href') for i in links]
+    # Return a list with the hyperlinks (as strings) scrapped from resp.raw_response.content
+    if links:
+        return links
+    return []
     #resp.raw_response.url: the url, again
-    
-    
-    return [] #something really messed up
 
 def is_valid(url):
     # Decide whether to crawl this url or not. 
@@ -91,15 +104,10 @@ def is_valid(url):
             robotsTxt.read()
             if not robotsTxt.can_fetch("UW23 55097037,94863973,34175030,70796407", url): # Check if url is allowed in robots.txt
                 return False
-            noFragment = url.replace(parsed.fragment,"")
-            validLinkHistoryNoFragments.add(noFragment) #add defrag link to set
             validLinkHistory.add(url)  #add link to overall history
             totalLinkHistory.add(url)
-            with open('valid.txt',"a") as f:
-                f.write((url+"    "+parsed.fragment)) #no reason do this, just wanted to see fragments
-                f.write("\n")
         else: #not valid
-            with open('invalid.txt',"a") as f:
+            with open('data/invalid.txt',"a") as f:
                 if not duplicated and url not in validLinkHistory: #will only add links invalid because of structure, not dupes
                     f.write(url)
                     f.write("\n")
