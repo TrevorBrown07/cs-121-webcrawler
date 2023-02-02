@@ -45,7 +45,7 @@ def compute_page_length(token_list):
 
 def save_page_length(page_lengths):
     file = open("data/page_lengths.txt", "a")
-    json.dump(page_lengths)
+    json.dump(page_lengths, file)
     file.write("\n")
     file.close()
 
