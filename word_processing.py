@@ -6,6 +6,7 @@ import hashlib
 import csv
 from collections import Counter
 from collections import defaultdict
+import pandas as pd
 stop_list = set(['a', 'about', 'above', 'after', 'again', 'against', 'all', 'am', 'an',
             'and', 'any', 'are', "aren't", 'as', 'at', 'be', 'because', 'been', 'before',
             'being', 'below', 'between', 'both', 'but', 'by', "can't", 'cannot', 'could',
@@ -69,40 +70,29 @@ def compute_page_length(token_list):
     return len(token_list)
 
 def find_longest_page():
-    columns = defaultdict(list)
-    with open("data/testing.csv","r") as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            for (k,v) in row.items():
-                if k == "Length":
-                    columns[k].append(int(v))
-                else:
-                    columns[k].append(v)
-                    
-    maxIndex = columns["Length"].index(max(columns["Length"]))
+    df = pd.read_csv("data/testing.csv")
+
+    column = df["Length"]           
+    max_index = column.idxmax()
 
     with open("data/report.txt", "a") as f:
-        f.write(f"\nLongest page found: {columns['Link'][maxIndex]} {columns['Length'][maxIndex]} \n\n")
+        f.write(f"\nLongest page found:\n{df.loc[[max_index]]}\n\n")
 
 
 def tally_top_50_words():
     top50 = Counter()
-
-    columns = defaultdict(list)
-    with open("data/testing.csv","r") as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            for (k,v) in row.items():
-                if k == "Frequencies":
-                    top50.update(Counter(json.loads(v)))
+    df = pd.read_csv("data/testing.csv")
+    columnSeriesObj = df['Frequencies']
+    for i in columnSeriesObj:
+        top50.update(Counter(json.loads(i)))
 
     answer = ""
-    count = 0
+    count = 1
     for i in top50.most_common():
         if i[0] not in stop_list and len(i[0]) != 1:
-            answer += (str(i) + "\n")
+            answer += ("["+str(count)+"] "+str(i) + "\n")
             count += 1
-        if count >= 50:
+        if count >= 51:
             break
     
     with open("data/report.txt", "a") as f:
@@ -110,38 +100,33 @@ def tally_top_50_words():
     
 
 def count_unique_links():
-    totalLinks = set()
-    columns = defaultdict(list)
-    with open("data/testing.csv","r") as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            for (k,v) in row.items():
-                if k == "Link":
-                    totalLinks.add(v.replace(urlparse(v).fragment,""))
+    df = pd.read_csv("data/testing.csv")
+
     with open("data/report.txt", "a") as f:
-        f.write(f"Total number of unique URLs: {len(totalLinks)}\n")
-        for i,v in enumerate(totalLinks,1):
-            f.write("["+str(i)+"] "+v)
-            f.write("\n")
+        f.write(f"Total number of unique URLs: {len(df.index)}\n")
 
     
 def count_subdomains():
     totalLinks = defaultdict(set)
-    columns = defaultdict(list)
-    with open("data/testing.csv","r") as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            for (k,v) in row.items():
-                parsed = urlparse(v)
-                if k == "Link" and re.search(r"ics.uci.edu",parsed.netloc):
-                    totalLinks[parsed.scheme+"://"+parsed.netloc].add(v.replace(parsed.fragment,""))
+    df = pd.read_csv("data/testing.csv")
+    columnSeriesObj = df['Link']
+    for i in columnSeriesObj:
+        parsed = urlparse(i)
+        if re.search(r"ics.uci.edu",parsed.netloc):
+            totalLinks[parsed.scheme+"://"+parsed.netloc].add(i.replace(parsed.fragment,""))
+
     answer = ""
     for i,v in totalLinks.items():
         answer += i + " "+str(len(v))+"\n"
         count = 1
+        maxPrint = 0
         for j in v:
             answer += " ["+str(count)+"] "+j
             count += 1
+            maxPrint += 1
+            if maxPrint >= 10:
+                answer += "  ...  "
+                break
         answer += "\n\n"
         
     with open("data/report.txt", "a") as f:
