@@ -1,85 +1,73 @@
+# python3 launch.py --restart
 import re
 from urllib.parse import urlparse
-import re
-from urllib.robotparser import RobotFileParser
 from bs4 import BeautifulSoup
 import lxml
-import word_processing
+import urllib.robotparser
+import word_processing as wp
+import csv
+import json
 
-
-word_processing.create_data_folder()
-validLinkHistoryNoFragments = set()
 validLinkHistory = set()
 totalLinkHistory = set()
+robotHistory = dict()
+websiteContentHistory = set()
+wp.create_data_folder()
 
 def scraper(url, resp):
+    links = extract_next_links(url, resp)
+    return [link for link in links if is_valid(link)]
+
+def extract_next_links(url, resp):
+    
+    # Implementation required.
+    # url: the URL that was used to get the page
+    # resp.url: the actual url of the page
+    actualURL = resp.url
     # resp.status: the status code returned by the server. 200 is OK, you got the page. Other numbers mean that there was some kind of problem.
     statusCode = resp.status
     # resp.error: when status is not 200, you can check the error here, if needed.
     if statusCode != 200:
         return []
-    # resp.raw_response: this is where the page actually is. More specifically, the raw_response has two parts:
-    rawResponse = resp.raw_response
-    #resp.raw_response.content: the content of the page!
-    htmlContent = rawResponse.content
-    soup = BeautifulSoup(htmlContent, "lxml")
-    token_list = word_processing.tokenize(soup.get_text()) #Create token list of text
-    if not token_list: #If the token list is empty, page is dead, no need to continue
-        return []
-    parsed = urlparse(url)
-    noFragment = url.replace(parsed.fragment,"")
-    if noFragment in validLinkHistoryNoFragments: 
-        pass
     else:
-        validLinkHistoryNoFragments.add(noFragment) 
-        with open('data/valid.txt',"a") as f:
-            f.write(noFragment)
-            f.write("\n")
-        word_frequencies = word_processing.compute_word_frequencies(token_list)
-        page_length = word_processing.compute_page_length(token_list)
-        word_processing.save_page_length({url:page_length})
-        word_processing.save_word_count(word_frequencies)
-    links = extract_next_links(soup, resp)
-    
-    return [link for link in links if is_valid(link)]
+        # resp.raw_response: this is where the page actually is. More specifically, the raw_response has two parts:
+        rawResponse = resp.raw_response
+        #resp.raw_response.content: the content of the page!
+        htmlContent = rawResponse.content
+        soup = BeautifulSoup(htmlContent, "lxml")
+        links = soup.find_all('a', href=True)
+        
+        alltext = soup.get_text()
+        tokens = wp.tokenize(alltext)
+        frequencies = wp.compute_word_frequencies(tokens)
+        pagelength = wp.compute_page_length(tokens)
 
-def extract_next_links(soup, resp):
-    # Implementation required.
-    # url: the URL that was used to get the page
-    links = soup.find_all('a', href=True)
-    links = [i.get('href') for i in links]
-    # Return a list with the hyperlinks (as strings) scrapped from resp.raw_response.content
-    if links:
-        return links
-    return []
-    #resp.raw_response.url: the url, again
 
-def is_valid(url):
-    # Decide whether to crawl this url or not. 
-    # If you decide to crawl it, return True; otherwise return False.
-    # There are already some conditions that return False.
-    try:
-        parsed = urlparse(url)
-        if parsed.scheme not in set(["http", "https"]):
-            return False
+        hashed = wp.compute_hash(tokens)
+        if hashed in websiteContentHistory: #it is a duplicated website
+            writeInvalid(7,url)
+            return []
+        else:
+            websiteContentHistory.add(hashed)
+            wp.write_csv(url,pagelength,hashed,json.dumps(frequencies))
 
-        netlocValid = re.search(
+
+        links = [i.get('href') for i in links]
+        # Return a list with the hyperlinks (as strings) scrapped from resp.raw_response.content
+        if links: return links
+        return []
+
+
+def determineNetLocValid(text):
+    return re.search(
             r"ics.uci.edu|"
             + r"cs.uci.edu|"
             + r"informatics.uci.edu|"
-            + r"stat.uci.edu", parsed.netloc.lower()
+            + r"stat.uci.edu", text.lower()
         )
-        pathValid = not re.match(
-            r".*\.(css|js|bmp|gif|jpe?g|ico"
-            + r"|png|tiff?|mid|mp2|mp3|mp4"
-            + r"|wav|avi|mov|mpeg|ram|m4v|mkv|ogg|ogv|pdf"
-            + r"|ps|eps|tex|ppt|pptx|doc|docx|xls|xlsx|names"
-            + r"|data|dat|exe|bz2|tar|msi|bin|7z|psd|dmg|iso"
-            + r"|epub|dll|cnf|tgz|sha1"
-            + r"|thmx|mso|arff|rtf|jar|csv"
-            + r"|rm|smil|wmv|swf|wma|zip|rar|gz)$", parsed.path.lower())
 
-        queryValid = not re.match(
+def determinePathQueryInvalid(text):
+    return re.match(
             r"(.*\.(css|js|bmp|gif|jpe?g|ico"
             + r"|png|tiff?|mid|mp2|mp3|mp4"
             + r"|wav|avi|mov|mpeg|ram|m4v|mkv|ogg|ogv|pdf"
@@ -87,41 +75,90 @@ def is_valid(url):
             + r"|data|dat|exe|bz2|tar|msi|bin|7z|psd|dmg|iso"
             + r"|epub|dll|cnf|tgz|sha1"
             + r"|thmx|mso|arff|rtf|jar|csv"
-            + r"|scm|ss|py|java|r|c|m|odc|war" #adscmsourcecode, sstemplatelanguage,odcmicrosoftdata,warwebsitefiles
-            + r"|rm|smil|wmv|swf|wma|zip|rar|gz)$)" #added 2 parentheses
-            + r"|(.*(action=login|action=edit|action=upload|action=download|action=source|action=lostpassword))"
+            #program files, ends with
+            + r"|scm|ss|py|java|r|c|m|odc|war" 
+            #program files, ends with
+            + r"|rm|smil|wmv|swf|wma|zip|rar|gz)$)" 
+            #INSERT HERE
+            + r"|(.*(action=login|action=edit|action=upload|action=download|action=source"
+            + r"|action=lostpassword|share=|calendar|ical=[0-9]+|page\/[0-9]+)"
+            + r"|[0-9]{4}\/[0-9]{2}\/[0-9]|HOTELTRIVAGO|HOTELTRIVAGO|HOTELTRIVAGO"
+            + r"|HOTELTRIVAGO|HOTELTRIVAGO|HOTELTRIVAGO|HOTELTRIVAGO"
+            + r"|HOTELTRIVAGO|HOTELTRIVAGO|HOTELTRIVAGO|HOTELTRIVAGO*.*)"
+            #INSERT HERE
+            , text.lower())
 
-            
-            
-            , parsed.query.lower())
+def determineRobotValid(fullurl,parsed):
+    robotURL = parsed.scheme + "://" + parsed.netloc + "/robots.txt"
+    if robotURL in robotHistory:
+        return robotHistory[robotURL].can_fetch("IR UW23 55097037,94863973,34175030,70796407",fullurl)
+    else:
+        try:
+            rp = urllib.robotparser.RobotFileParser()
+            rp.set_url(robotURL)
+            rp.read()
+            robotHistory[robotURL] = rp
+            return rp.can_fetch("IR UW23 55097037,94863973,34175030,70796407",fullurl)
+        except:
+            return False
+
+def determineFragmentInvalid(text):
+    return re.match(
+            r".*(comment-|respond).*"
+            , text.lower())
+
+
+def writeInvalid(error,url):
+    with open('data/invalid.txt',"a") as f:
+        f.write(str(error)+"    "+url) 
+        f.write("\n")
+
+def is_valid(url):
+    # Decide whether to crawl this url or not. 
+    # If you decide to crawl it, return True; otherwise return False.
+    # There are already some conditions that return False.
+    try:
         
-        duplicated = url in totalLinkHistory #returns true if url has not been seen
 
-        everythingValid = netlocValid and pathValid and queryValid and not duplicated
+        
+        if url in totalLinkHistory:
+            # writeInvalid(5,url)
+            return False
+        totalLinkHistory.add(url)
+        parsed = urlparse(url)
+        if parsed.scheme not in set(["http", "https"]):
+            # writeInvalid(0,url)
+            return False
 
-        if (everythingValid): #netloc is correct, path is correct, and entire link is unique
-            robotsTxt = RobotFileParser(parsed.scheme + "://" + parsed.netloc + "/robots.txt")
-            try:
-                robotsTxt.read()
-                if not robotsTxt.can_fetch("UW23 55097037,94863973,34175030,70796407", url): # Check if url is allowed in robots.txt
-                    return False
-            except:
-                pass
-            validLinkHistory.add(url)  #add link to overall history
-            totalLinkHistory.add(url)
-        else: #not valid
-            with open('data/invalid.txt',"a") as f:
-                if not duplicated and url not in validLinkHistory: #will only add links invalid because of structure, not dupes
-                    f.write(url)
-                    f.write("\n")
-                    
+        if not determineNetLocValid(parsed.netloc):
+            writeInvalid(2,url)
+            return False
 
+        if determinePathQueryInvalid(parsed.path): #this is path
+            writeInvalid(3,url)
+            return False
 
-        return everythingValid  #true if both true
+        if determinePathQueryInvalid(parsed.query): #this is query
+            writeInvalid(4,url)
+            return False
+
+        if not determineRobotValid(url,parsed):
+            writeInvalid(6,url)
+            return False
+        
+        if determineFragmentInvalid(parsed.fragment):
+            writeInvalid(8,url)
+            return False
+
+        validLinkHistory.add(url)  #add link to overall history
+        with open('data/valid.txt',"a") as f:
+            f.write(url) 
+            f.write("\n")
+        return True
 
     except TypeError:
         print ("TypeError for ", parsed)
         raise
 
 if __name__ == '__main__':
-    print('not this one')
+    print('reset data folder')
