@@ -39,6 +39,8 @@ def extract_next_links(url, resp):
         
         alltext = soup.get_text()
         tokens = wp.tokenize(alltext)
+        if len(tokens) < 100:
+            return []
         frequencies = wp.compute_word_frequencies(tokens)
         pagelength = wp.compute_page_length(tokens)
 
@@ -79,34 +81,39 @@ def determinePathQueryInvalid(text):
             + r"|scm|ss|py|java|r|c|m|odc|war" 
             #program files, ends with
             + r"|rm|smil|wmv|swf|wma|zip|rar|gz)$)" 
-            #INSERT HERE
-            + r"|(.*(action=login|action=edit|action=upload|action=download|action=source"
-            + r"|action=lostpassword|share=|calendar|ical=[0-9]+|page\/[0-9]+)"
-            + r"|[0-9]{4}\/[0-9]{2}\/[0-9]|HOTELTRIVAGO|HOTELTRIVAGO|HOTELTRIVAGO"
-            + r"|HOTELTRIVAGO|HOTELTRIVAGO|HOTELTRIVAGO|HOTELTRIVAGO"
-            + r"|HOTELTRIVAGO|HOTELTRIVAGO|HOTELTRIVAGO|HOTELTRIVAGO*.*)"
-            #INSERT HERE
+            #bad, surrounded by anything
+            + r"|(.*(action=login|action=edit|action=upload|action=download|action=source|"
+            + r"action=lostpassword|share=|calendar|ical=[0-9]+|page\/[0-9]+).*)"
+            #bad, surrounded by anything
             , text.lower())
+
 
 def determineRobotValid(fullurl,parsed):
     robotURL = parsed.scheme + "://" + parsed.netloc + "/robots.txt"
+    if getResponseCode(robotURL) != 200:
+        return False
     if robotURL in robotHistory:
         return robotHistory[robotURL].can_fetch("IR UW23 55097037,94863973,34175030,70796407",fullurl)
+        
     else:
-        try:
-            rp = urllib.robotparser.RobotFileParser()
-            rp.set_url(robotURL)
-            rp.read()
-            robotHistory[robotURL] = rp
-            return rp.can_fetch("IR UW23 55097037,94863973,34175030,70796407",fullurl)
-        except:
-            return False
+        rp = urllib.robotparser.RobotFileParser()
+        rp.set_url(robotURL)
+        rp.read()
+        robotHistory[robotURL] = rp
+        return rp.can_fetch("IR UW23 55097037,94863973,34175030,70796407",fullurl)
+
 
 def determineFragmentInvalid(text):
     return re.match(
             r".*(comment-|respond).*"
             , text.lower())
 
+def getResponseCode(url):
+    try:
+        conn = urllib.request.urlopen(url)
+        return conn.getcode()
+    except:
+        return -1
 
 def writeInvalid(error,url):
     with open('data/invalid.txt',"a") as f:
@@ -120,25 +127,28 @@ def is_valid(url):
     try:
         
 
-        
+        totalLinkHistory.add(url)
         if url in totalLinkHistory:
             # writeInvalid(5,url)
             return False
-        totalLinkHistory.add(url)
+    
         parsed = urlparse(url)
         if parsed.scheme not in set(["http", "https"]):
             # writeInvalid(0,url)
+            return False
+        if getResponseCode(url) != 200:
+            writeInvalid(1,url)
             return False
 
         if not determineNetLocValid(parsed.netloc):
             writeInvalid(2,url)
             return False
 
-        if determinePathQueryInvalid(parsed.path): #this is path
+        if determinePathQueryInvalid(parsed.path):
             writeInvalid(3,url)
             return False
 
-        if determinePathQueryInvalid(parsed.query): #this is query
+        if determinePathQueryInvalid(parsed.query):
             writeInvalid(4,url)
             return False
 
